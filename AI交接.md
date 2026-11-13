@@ -54,4 +54,4 @@ BRIDGE75_TAG=power ./build.sh
 (cd ../firmware && shasum -a 256 -c SHA256SUMS-power-<本次时间>)
 ```
 
-脚本会运行 lint 和三组主机回归后输出软唤醒版、复位回退版和校验值，文件名带标签和精确到分钟的构建时间，例如 `bridge75_ansi_norgb_ack_20261113-2237.bin` 与 `SHA256SUMS-ack-20261113-2237`，校验时换成本次输出的文件名。不设 `BRIDGE75_TAG` 时标签为 `final`；终版与更早的产物是加时间戳之前生成的，文件名不带时间。日志写在 `firmware/` 下且不带标签，下次构建前先移走；终版日志在 `firmware/logs-final/`，ack 各构建的日志在 `firmware/logs-ack-<时间>/`。对应源码见 power 版补丁（`bridge75-official-qmk-power.patch`）（ack 版为 ack 版补丁（`bridge75-official-qmk-ack.patch`），终版为 终版补丁（`bridge75-official-qmk-final.patch`）），刷写步骤见 [README](README.md)。早期排障会话 ID 为 `01a1d421-278d-7101-9522-12624f50a320`。
+脚本会运行 lint 和三组主机回归后输出软唤醒版、复位回退版和校验值，文件名带标签和精确到分钟的构建时间，例如 `bridge75_ansi_norgb_ack_20261113-2237.bin` 与 `SHA256SUMS-ack-20261113-2237`，校验时换成本次输出的文件名。不设 `BRIDGE75_TAG` 时标签为 `final`；终版与更早的产物是加时间戳之前生成的，文件名不带时间。每次构建的日志自动写进 `firmware/logs-<标签>-<时间>/`，不会互相覆盖；终版日志在 `firmware/logs-final/`。各版本源码就是本仓库的提交历史（`firmware/` 里另有旧的补丁文件），刷写步骤见 [README](README.md)。早期排障会话 ID 为 `01a1d421-278d-7101-9522-12624f50a320`。

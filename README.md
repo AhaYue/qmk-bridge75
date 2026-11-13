@@ -33,7 +33,7 @@ git -C ../qmk-bridge75-ansi-norgb submodule update --init --recursive
 BRIDGE75_TAG=power ./build.sh
 ```
 
-`build.sh` 默认使用同级目录 `../qmk-bridge75-ansi-norgb`，可用 `QMK_DIR=/path/to/qmk_firmware` 指定。输出在 QMK checkout 同级的 `firmware/` 目录，文件名带标签和构建时间，例如 `bridge75_ansi_norgb_power_20261113-2349.bin`，同时生成 `_resetwake` 回退版和 `SHA256SUMS-power-20261113-2349`。
+`build.sh` 默认使用同级目录 `../qmk-bridge75-ansi-norgb`，可用 `QMK_DIR=/path/to/qmk_firmware` 指定。输出在 QMK checkout 同级的 `firmware/` 目录，文件名带标签和构建时间，例如 `bridge75_ansi_norgb_power_20261113-2349.bin`，同时生成 `_resetwake` 回退版和 `SHA256SUMS-power-20261113-2349`，日志在 `firmware/logs-power-20261113-2349/`。
 
 **源码以本仓库为准。** 同步会覆盖 QMK checkout 里的 `keyboards/shortcut/bridge75`、`keyboards/shortcut/wireless` 和 `tools/bridge75`，不要在那边改。
 
