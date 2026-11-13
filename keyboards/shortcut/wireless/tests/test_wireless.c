@@ -11,7 +11,16 @@ static unsigned input_pos, input_len, transmitted;
 uint32_t sync_timer_read32(void) { return now; }
 uint32_t sync_timer_elapsed32(uint32_t t) { return now - t; }
 void uart_init(uint32_t baud) { (void)baud; }
-void uart_transmit(const uint8_t *data, uint16_t length) { (void)data; (void)length; transmitted++; }
+// Optional simulated module: ACKs every received copy after a latency; can lose copies.
+static bool sim_module;
+static unsigned sim_latency, sim_lose, sim_pending;
+static uint32_t sim_ack_at[256];
+void uart_transmit(const uint8_t *data, uint16_t length) {
+    (void)length; transmitted++;
+    if (!sim_module || data[0] == 0x61) return;
+    if (sim_lose) { --sim_lose; return; }
+    sim_ack_at[sim_pending++] = now + sim_latency;
+}
 bool uart_available(void) { return input_pos < input_len; }
 uint8_t uart_read(void) { return input[input_pos++]; }
 void last_matrix_activity_trigger(void) {}
@@ -50,7 +59,7 @@ static void parser(void) {
 }
 static void retries(void) {
     reset(); md_send_devctrl(MD_SND_CMD_DEVCTRL_FW_VERSION);
-    for (unsigned i=0;i<200;++i) { now += 11; md_send_pkt_task(); }
+    for (unsigned i=0;i<200;++i) { now += MD_SNED_PKT_TIMEOUT + 1; md_send_pkt_task(); }
     assert(!smsg_is_busy()); assert(md_info.state==MD_STATE_DISCONNECTED);
     assert(smsg_retry==0);
     md_send_devctrl(MD_SND_CMD_DEVCTRL_FW_VERSION); md_send_pkt_task();
@@ -105,7 +114,7 @@ static void recovery_and_switch(void) {
     reset(); uint8_t release[8]={0}, frame[50];
     md_send_kb(release); md_report_task(); assert(report_count==0);
     // All transitions are already in smsg when UART stops acknowledging.
-    for(unsigned i=0;i<200;++i) { now+=11; md_send_pkt_task(); }
+    for(unsigned i=0;i<200;++i) { now+=MD_SNED_PKT_TIMEOUT+1; md_send_pkt_task(); }
     assert(!smsg_is_busy() && report_count==0 && resync_mask);
     now+=500; md_report_task();
     assert(smsg_peek(frame)==3 && frame[1]==MD_SND_CMD_DEVCTRL_BT1);
@@ -137,7 +146,7 @@ static void control_only_recovery(void) {
     reset(); wls_devs=DEVS_BT1;
     md_info.state=MD_STATE_DISCONNECTED;
     md_send_devctrl(MD_SND_CMD_DEVCTRL_BT1);
-    for(unsigned i=0;i<200;++i) { now+=11; md_send_pkt_task(); }
+    for(unsigned i=0;i<200;++i) { now+=MD_SNED_PKT_TIMEOUT+1; md_send_pkt_task(); }
     assert(!smsg_is_busy() && reconnect_pending);
     assert(report_count==0 && resync_mask==0);
     now+=500; md_report_task();
@@ -162,6 +171,64 @@ static void diagnostic_counts(void) {
     assert(md_get_tx_count()==tx+1);
     feed(0x61,0x0d,0x0a);
     assert(md_get_ack_count()==ack+1);
+}
+
+static void duplicate_ack_alias(void) {
+    reset();
+    uint8_t frame[50];
+    // Frame A times out once, so it is on the wire twice and owes two ACKs.
+    md_send_devctrl(MD_SND_CMD_DEVCTRL_BT1);
+    md_send_devctrl(MD_SND_CMD_DEVCTRL_FW_VERSION);
+    md_send_pkt_task();
+    now += MD_SNED_PKT_TIMEOUT + 1; md_send_pkt_task(); md_send_pkt_task(); md_send_pkt_task();
+    assert(frame_sends == 2 && smsg_get_state() == smsg_state_busy);
+    // The first ACK completes A and B goes out in the same pass.
+    feed(0x61, 0x0d, 0x0a); md_send_pkt_task();
+    assert(smsg_peek(frame) == 3 && frame[1] == MD_SND_CMD_DEVCTRL_FW_VERSION);
+    assert(stale_acks == 1 && smsg_get_state() == smsg_state_busy);
+    // The retransmission's ACK must not be credited to B.
+    feed(0x61, 0x0d, 0x0a); md_send_pkt_task();
+    assert(stale_acks == 0 && smsg_is_busy() && smsg_get_state() == smsg_state_busy);
+    // B's own ACK completes it.
+    feed(0x61, 0x0d, 0x0a); md_send_pkt_task();
+    assert(!smsg_is_busy());
+    // An owed ACK that never arrives expires instead of eating later ACKs forever.
+    md_send_devctrl(MD_SND_CMD_DEVCTRL_BT1);
+    md_send_pkt_task();
+    now += MD_SNED_PKT_TIMEOUT + 1; md_send_pkt_task(); md_send_pkt_task(); md_send_pkt_task();
+    assert(frame_sends == 2);
+    feed(0x61, 0x0d, 0x0a); md_send_pkt_task();
+    assert(!smsg_is_busy() && stale_acks == 1);
+    now += MD_STALE_ACK_WINDOW + 1;
+    md_send_devctrl(MD_SND_CMD_DEVCTRL_FW_VERSION);
+    md_main_task();
+    assert(stale_acks == 0);
+    feed(0x61, 0x0d, 0x0a); md_send_pkt_task();
+    assert(!smsg_is_busy());
+}
+
+// Device log: tx=20 retries=10 ack=10 rx=19 ACKs after only the first copy was lost.
+static void lost_copy_no_cascade(void) {
+    reset(); md_info.state = MD_STATE_CONNECTED;
+    sim_module = true; sim_latency = 2; sim_lose = 1; sim_pending = 0;
+    uint32_t retries_before = md_get_retry_count(), tx_before = md_get_tx_count();
+    for (unsigned i = 0; i < 10; ++i) md_send_devctrl(MD_SND_CMD_DEVCTRL_FW_VERSION);
+    for (unsigned t = 0; t < 2000 && smsg_is_busy(); ++t) {
+        now++;
+        input_pos = input_len = 0;
+        unsigned kept = 0;
+        for (unsigned i = 0; i < sim_pending; ++i) {
+            if (sim_ack_at[i] <= now) { memcpy(&input[input_len], "\x61\x0d\x0a", 3); input_len += 3; }
+            else sim_ack_at[kept++] = sim_ack_at[i];
+        }
+        sim_pending = kept;
+        md_receive_msg_task(); md_send_pkt_task();
+    }
+    assert(!smsg_is_busy());
+    // One lost copy may cost one retransmission, not one per remaining frame.
+    assert(md_get_retry_count() - retries_before <= 2);
+    assert(md_get_tx_count() - tx_before <= 12);
+    sim_module = false;
 }
 
 static void late_ack_and_metadata(void) {
@@ -215,6 +282,8 @@ int main(void) {
     control_only_recovery();
     diagnostic_counts();
     late_ack_and_metadata();
+    duplicate_ack_alias();
+    lost_copy_no_cascade();
     queue_model();
-    puts("PASS wireless: parser, retry bound, late ACK, replay, backpressure, NKRO, host switch, control-only recovery, metadata, 1M queue operations");
+    puts("PASS wireless: parser, retry bound, late ACK, duplicate ACK, lost copy without cascade, replay, backpressure, NKRO, host switch, control-only recovery, metadata, 1M queue operations");
 }

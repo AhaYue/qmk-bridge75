@@ -36,7 +36,7 @@ The right key next to right Alt/GUI is Fn. Both Windows and Mac Fn layers have:
 | Fn + Escape | Reset EEPROM and return to USB defaults |
 
 Open a plain text editor before Fn+D. Keep the keyboard idle while the line is
-typed. The line starts with `bridge75-final` and includes the module firmware byte (`fw`), selected device,
+typed. The line starts with `bridge75-<tag>-<YYYYMMDD-HHMM>` (or `bridge75-dev` outside `tools/bridge75/build.sh`) and includes the module firmware byte (`fw`), selected device,
 connection state, STOP wake count and source, transmit retries, dropped messages,
 and module sleep setting (`sleep=0` means disabled). Output pauses while keys
 are held or wireless is disconnected. Counters reset on MCU restart; the reset

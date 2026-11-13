@@ -12,8 +12,15 @@ uint8_t wireless_get_current_devs(void);
 #    define MD_BAUD_RATE 115200
 #endif
 
+// Observed module ACKs can arrive after 10 ms; a short timeout only creates
+// duplicate transmissions whose ACKs then have to be reconciled.
 #ifndef MD_SNED_PKT_TIMEOUT
-#    define MD_SNED_PKT_TIMEOUT 10
+#    define MD_SNED_PKT_TIMEOUT 30
+#endif
+
+// ACKs owed for already-completed frames are discarded until this quiet window ends.
+#ifndef MD_STALE_ACK_WINDOW
+#    define MD_STALE_ACK_WINDOW 100
 #endif
 
 #ifndef MD_SEND_PKT_RETRY
@@ -72,6 +79,17 @@ static uint8_t md_raw_payload[MD_RAW_SIZE]             = {0};
 
 static uint32_t smsg_timer, rx_timer, retry_count, drop_count, reconnect_timer;
 static uint8_t  smsg_retry, rx_count, rx_expected;
+// Module ACKs carry no sequence number. Every transmission of a frame earns one
+// ACK, so after the first ACK completes a frame its retransmissions still owe
+// ACKs. Consuming those first can cause a harmless retransmission of the next
+// frame, instead of crediting it with an ACK it never earned.
+// If the module never sent an owed ACK (that copy was lost), the frame in flight
+// has its own ACK consumed and times out. Its retransmission would then owe an
+// ACK of its own and the same thing would repeat for every frame in a burst.
+// A timeout after a consumed ACK therefore counts that ACK as this frame's.
+static uint8_t  frame_sends, stale_acks;
+static bool     frame_ate_ack;
+static uint32_t stale_ack_timer;
 static bool     reconnect_pending;
 static uint32_t rx_bytes, rx_ack_count, rx_valid_count, rx_bad_count, tx_packet_count;
 
@@ -137,9 +155,15 @@ static uint8_t md_report_index(uint8_t cmd) {
     }
 }
 
+static void md_ack_reset(void) {
+    frame_sends = stale_acks = 0;
+    frame_ate_ack            = false;
+}
+
 void md_report_reset(void) {
     smsg_init();
     smsg_retry        = 0;
+    md_ack_reset();
     reconnect_pending = false;
     report_head = report_count = resync_mask = 0;
     memset(latest, 0, sizeof(latest));
@@ -277,6 +301,9 @@ void md_receive_host_cb(bool resume) __attribute__((weak));
 void md_receive_host_cb(bool resume) {}
 
 static void md_receive_msg_task(void) {
+    if (stale_acks && sync_timer_elapsed32(stale_ack_timer) > MD_STALE_ACK_WINDOW) {
+        stale_acks = 0;
+    }
     if (rx_count && sync_timer_elapsed32(rx_timer) > 20) {
         rx_count = 0;
         drop_count++;
@@ -314,10 +341,27 @@ static void md_receive_msg_task(void) {
         uint8_t data_count = rx_count;
         rx_count           = 0; // callbacks may consume this frame; always release parser first.
         if (md_rev_payload[0] == 0x61) {
+            if (md_rev_payload[1] != 0x0D || data != 0x0A) {
+                continue;
+            }
             smsg_states_t state = smsg_get_state();
-            if (md_rev_payload[1] == 0x0D && data == 0x0A && (state == smsg_state_busy || state == smsg_state_retry)) {
+            if (stale_acks) {
+                --stale_acks;
+                stale_ack_timer = sync_timer_read32();
+                if (state == smsg_state_busy || state == smsg_state_retry) {
+                    frame_ate_ack = true;
+                }
+                continue;
+            }
+            if (state == smsg_state_busy || state == smsg_state_retry) {
                 ++rx_ack_count;
                 smsg_set_state(smsg_state_replied);
+                if (frame_sends > 1) {
+                    stale_acks      = frame_sends - 1;
+                    stale_ack_timer = sync_timer_read32();
+                }
+                frame_sends   = 0;
+                frame_ate_ack = false;
             }
             continue;
         }
@@ -385,6 +429,11 @@ static void md_send_pkt_task(void) {
     switch (smsg_get_state()) {
         case smsg_state_busy: {
             if (sync_timer_elapsed32(smsg_timer) > (MD_SNED_PKT_TIMEOUT)) {
+                if (frame_ate_ack && frame_sends) {
+                    // The consumed ACK was most likely this frame's own.
+                    --frame_sends;
+                    frame_ate_ack = false;
+                }
                 smsg_set_state(smsg_state_retry);
             }
         } break;
@@ -395,6 +444,7 @@ static void md_send_pkt_task(void) {
                 drop_count++;
                 smsg_init();
                 smsg_retry        = 0;
+                md_ack_reset();
                 md_info.state     = MD_STATE_DISCONNECTED;
                 reconnect_timer   = sync_timer_read32();
                 reconnect_pending = true;
@@ -406,11 +456,15 @@ static void md_send_pkt_task(void) {
             smsg_retry = 0;
             smsg_pop();
             smsg_set_state(smsg_state_free);
-        } // break;
+        }
+            // fall through: send the next queued frame in the same pass.
         case smsg_state_free: {
             uint32_t size = smsg_peek(md_pkt_payload);
             if (size) {
                 if (md_send_pkt(md_pkt_payload, size)) {
+                    if (frame_sends < UINT8_MAX) {
+                        ++frame_sends;
+                    }
                     smsg_timer = sync_timer_read32();
                     smsg_set_state(smsg_state_busy);
                 } else {
@@ -428,6 +482,7 @@ void md_init(void) {
     smsg_init();
     smsg_retry = rx_count = 0;
     reconnect_pending     = false;
+    md_ack_reset();
 
     memset(md_pkt_payload, 0, sizeof(md_pkt_payload));
 }
