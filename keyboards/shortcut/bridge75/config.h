@@ -41,5 +41,7 @@
 //#define WLS_KEYBOARD_REPORT_KEYS 5
 #define WLS_KEYBOARD_REPORT_KEYS KEYBOARD_REPORT_KEYS
 #define LPWR_TIMEOUT 300000 // 5 Minutes
+// Battery level changes slowly; polling every 3 s only keeps the module busy.
+#define WLS_INQUIRY_BAT_TIME 30000
 
 // Build with -DWB32_WAKE_RESET_HACK only for the reset-on-wake fallback.

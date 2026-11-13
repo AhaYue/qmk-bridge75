@@ -198,10 +198,13 @@ void wireless_task(void) {
     usb_remote_wakeup();
     if (get_transport() == TRANSPORT_WLS && lpwr_get_state() == LPWR_NORMAL) {
         static uint32_t inqtimer = 0x00;
+        static bool     inquired = false;
 
-        if (sync_timer_elapsed32(inqtimer) >= (WLS_INQUIRY_BAT_TIME)) {
+        // Ask once as soon as the link is idle, then at the slow interval.
+        if (!inquired || sync_timer_elapsed32(inqtimer) >= (WLS_INQUIRY_BAT_TIME)) {
             if (md_inquire_bat()) {
                 inqtimer = sync_timer_read32();
+                inquired = true;
             }
         }
     }

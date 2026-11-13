@@ -31,6 +31,17 @@ uint8_t wireless_get_current_devs(void);
 #    define MD_SEND_PKT_PAYLOAD_MAX 50
 #endif
 
+// While disconnected the saved host is reselected, first after 500 ms and then
+// at doubling intervals up to 10 s, so an absent host does not keep the UART
+// busy and the MCU out of STOP. New input or a reset returns to the short delay.
+#ifndef MD_RECONNECT_MIN
+#    define MD_RECONNECT_MIN 500
+#endif
+
+#ifndef MD_RECONNECT_MAX
+#    define MD_RECONNECT_MAX 10000
+#endif
+
 #ifndef MD_BT1_NAME
 #    define MD_BT1_NAME PRODUCT " BT1"
 #endif
@@ -91,6 +102,7 @@ static uint8_t  frame_sends, stale_acks;
 static bool     frame_ate_ack;
 static uint32_t stale_ack_timer;
 static bool     reconnect_pending;
+static uint32_t reconnect_interval = MD_RECONNECT_MIN;
 static uint32_t rx_bytes, rx_ack_count, rx_valid_count, rx_bad_count, tx_packet_count;
 
 static md_info_t md_info = {
@@ -166,6 +178,7 @@ void md_report_reset(void) {
     md_ack_reset();
     reconnect_pending = false;
     report_head = report_count = resync_mask = 0;
+    reconnect_interval                       = MD_RECONNECT_MIN;
     memset(latest, 0, sizeof(latest));
 }
 
@@ -181,6 +194,9 @@ static void md_report_submit(uint8_t *data, uint8_t length) {
     uint8_t     index  = md_report_index(data[0]);
     md_report_t report = {.time = sync_timer_read32(), .length = length};
     memcpy(report.data, data, length);
+    if (md_info.state != MD_STATE_CONNECTED) {
+        reconnect_interval = MD_RECONNECT_MIN; // the user is typing: reconnect promptly
+    }
     latest[index] = report;
     if (index == 5) {
         // Mouse deltas are relative; recovery must only synchronize buttons.
@@ -220,8 +236,9 @@ static void md_report_task(void) {
         md_report_resync();
     }
     if (md_info.state != MD_STATE_CONNECTED) {
-        if (wireless_get_current_devs() != DEVS_USB && (reconnect_pending || report_count || resync_mask) && md_info.state != MD_STATE_PAIRING && sync_timer_elapsed32(reconnect_timer) >= 500 && !smsg_is_busy()) {
-            reconnect_timer = sync_timer_read32();
+        if (wireless_get_current_devs() != DEVS_USB && (reconnect_pending || report_count || resync_mask) && md_info.state != MD_STATE_PAIRING && sync_timer_elapsed32(reconnect_timer) >= reconnect_interval && !smsg_is_busy()) {
+            reconnect_timer    = sync_timer_read32();
+            reconnect_interval = reconnect_interval >= MD_RECONNECT_MAX / 2 ? MD_RECONNECT_MAX : reconnect_interval * 2;
             md_devs_change(wireless_get_current_devs(), false);
             if (reconnect_pending) md_recovery_kb();
         }
@@ -276,6 +293,7 @@ void md_recovery_kb(void) {}
 
 void md_recover(void) {
     md_init();
+    reconnect_interval = MD_RECONNECT_MIN;
     md_info.state     = MD_STATE_DISCONNECTED;
     reconnect_pending = true;
     md_report_resync();
@@ -394,8 +412,9 @@ static void md_receive_msg_task(void) {
                             if (md_info.state != MD_STATE_CONNECTED) {
                                 md_report_resync();
                             }
-                            reconnect_pending = false;
-                            md_info.state     = MD_STATE_CONNECTED;
+                            reconnect_pending  = false;
+                            reconnect_interval = MD_RECONNECT_MIN;
+                            md_info.state      = MD_STATE_CONNECTED;
                         } break;
                         case MD_REV_CMD_DEVCTRL_DISCONNECTED: {
                             md_info.state = MD_STATE_DISCONNECTED;
@@ -446,8 +465,9 @@ static void md_send_pkt_task(void) {
                 smsg_retry        = 0;
                 md_ack_reset();
                 md_info.state     = MD_STATE_DISCONNECTED;
-                reconnect_timer   = sync_timer_read32();
-                reconnect_pending = true;
+                reconnect_timer    = sync_timer_read32();
+                reconnect_interval = MD_RECONNECT_MIN;
+                reconnect_pending  = true;
                 md_report_resync();
             }
             smsg_set_state(smsg_state_free);

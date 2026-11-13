@@ -231,6 +231,49 @@ static void lost_copy_no_cascade(void) {
     sim_module = false;
 }
 
+static void reconnect_backoff(void) {
+    reset(); md_info.state = MD_STATE_DISCONNECTED; reconnect_pending = true;
+    uint8_t frame[50];
+    unsigned attempts = 0; uint32_t last = 0, gap = 0;
+    for (unsigned t = 0; t < 60000; t += 10) {
+        now = t; md_report_task();
+        while (smsg_is_busy()) {
+            smsg_peek(frame);
+            if (frame[0] == MD_SND_CMD_DEVCTRL && frame[1] == MD_SND_CMD_DEVCTRL_BT1) {
+                if (attempts) gap = now - last;
+                last = now; ++attempts;
+            }
+            smsg_pop();
+        }
+    }
+    // 0, 0.5, 1.5, 3.5, 7.5, 15.5 s, then every 10 s: far fewer than one per 500 ms.
+    assert(attempts >= 8 && attempts <= 12 && gap == MD_RECONNECT_MAX);
+    // Typing while disconnected returns to the short delay.
+    uint8_t down[8] = {0, 0, 4};
+    md_send_kb(down);
+    now += MD_RECONNECT_MIN; md_report_task();
+    assert(smsg_peek(frame) == 3 && frame[1] == MD_SND_CMD_DEVCTRL_BT1);
+    // A connection resets the interval for the next outage.
+    while (smsg_is_busy()) smsg_pop();
+    feed(MD_REV_CMD_DEVCTRL, MD_REV_CMD_DEVCTRL_CONNECTED, MD_REV_CMD_DEVCTRL + MD_REV_CMD_DEVCTRL_CONNECTED);
+    assert(reconnect_interval == MD_RECONNECT_MIN);
+}
+
+static void battery_inquiry_schedule(void) {
+    reset();
+    uint8_t frame[50];
+    now = 1; wireless_task();
+    assert(smsg_peek(frame) == 3 && frame[1] == MD_SND_CMD_DEVCTRL_INQVOL); // first query without waiting
+    while (smsg_is_busy()) smsg_pop();
+    smsg_set_state(smsg_state_free);
+    now += WLS_INQUIRY_BAT_TIME - 1; wireless_task();
+    assert(!smsg_peek(frame) || frame[1] != MD_SND_CMD_DEVCTRL_INQVOL);
+    while (smsg_is_busy()) smsg_pop();
+    smsg_set_state(smsg_state_free);
+    now += 1; wireless_task();
+    assert(smsg_peek(frame) == 3 && frame[1] == MD_SND_CMD_DEVCTRL_INQVOL);
+}
+
 static void late_ack_and_metadata(void) {
     reset();
     uint32_t retries_before = md_get_retry_count();
@@ -284,6 +327,8 @@ int main(void) {
     late_ack_and_metadata();
     duplicate_ack_alias();
     lost_copy_no_cascade();
+    reconnect_backoff();
+    battery_inquiry_schedule();
     queue_model();
-    puts("PASS wireless: parser, retry bound, late ACK, duplicate ACK, lost copy without cascade, replay, backpressure, NKRO, host switch, control-only recovery, metadata, 1M queue operations");
+    puts("PASS wireless: parser, retry bound, late ACK, duplicate ACK, lost copy without cascade, reconnect backoff, battery inquiry schedule, replay, backpressure, NKRO, host switch, control-only recovery, metadata, 1M queue operations");
 }
