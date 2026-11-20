@@ -1,0 +1,153 @@
+name: 构建固件与 VIA 定义
+
+# 在 GitHub 上复现本机 build.sh：同步源码到固定版本的 QMK，
+# 跑 lint、三组主机测试，编译软唤醒版和 resetwake 回退版，
+# 最后把 bin、校验值、日志和 VIA 定义作为 artifact 上传。
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 固件标签（写入文件名和 Fn+D 前缀）
+        required: false
+        default: ci
+  push:
+    branches: [main]
+    paths:
+      - "keyboards/**"
+      - "tools/**"
+      - "build.sh"
+      - "docs/via/**"
+      - ".github/workflows/build.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: 编译
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      TAG: ${{ inputs.tag || 'ci' }}
+      QMK_DIR: ${{ github.workspace }}/qmk_firmware
+      QMK_HOME: ${{ github.workspace }}/qmk_firmware
+
+    steps:
+      - name: 检出固件源码
+        uses: actions/checkout@v7
+        with:
+          path: bridge75-qmk
+
+      - name: 检出 QMK 基线
+        uses: actions/checkout@v7
+        with:
+          repository: qmk/qmk_firmware
+          # 本机实测的基线；升级 QMK 时同步修改这里和 README。
+          ref: 33292390974c75362ca30873c482d052e0bd7a63
+          path: qmk_firmware
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: 安装 ARM 工具链和 QMK CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi \
+            rsync libdigest-sha-perl libusb-1.0-0-dev libudev-dev
+          # 与本机 .venv-qmk 里的版本保持一致，避免 CLI 行为漂移。
+          python3 -m pip install --user "qmk==1.2.0"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          arm-none-eabi-gcc --version | head -1
+          "$HOME/.local/bin/qmk" --version
+
+      - name: 检查 VIA 定义与固件一致
+        working-directory: bridge75-qmk
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+
+          info = json.load(open("keyboards/shortcut/bridge75/info.json"))
+          board = json.load(open("keyboards/shortcut/bridge75/ansi_norgb/keyboard.json"))
+          via = json.load(open("docs/via/bridge75-norgb-via.json"))
+
+          # VIA 按 customKeycodes 的数组下标对应 QK_KB_n，顺序即固件里的键位。
+          # 增删自定义键位时，这里和 docs/via、info.json 一起改。
+          expected = ["BT1", "BT2", "BT3", "2.4G", "USB", "DIAG", "BAT", "SLEEP"]
+          actual = [entry["name"] for entry in via["customKeycodes"]]
+          if actual != expected:
+              sys.exit(f"VIA customKeycodes 是 {actual}，应为 {expected}")
+          if len(info["keycodes"]) != len(expected):
+              sys.exit(f"info.json 有 {len(info['keycodes'])} 个 keycodes，VIA 定义有 {len(expected)} 项")
+
+          if int(via["vendorId"], 16) != int(board["usb"]["vid"], 16):
+              sys.exit("VIA vendorId 与 keyboard.json 的 vid 不一致")
+          if int(via["productId"], 16) != int(board["usb"]["pid"], 16):
+              sys.exit("VIA productId 与 keyboard.json 的 pid 不一致")
+
+          print(f"VIA 定义 OK：{len(actual)} 个自定义键位，VID/PID 与固件一致")
+          PY
+
+      - name: 编译
+        working-directory: bridge75-qmk
+        run: |
+          case "$TAG" in
+            *[!A-Za-z0-9._-]*|"") echo "标签 $TAG 含有文件名不允许的字符" >&2; exit 1 ;;
+          esac
+          ./build.sh
+
+      - name: 核对产物
+        working-directory: ${{ github.workspace }}/firmware
+        run: |
+          set -eu
+          shasum -a 256 -c SHA256SUMS-*
+          warnings=$(grep -ci warning logs-*/build-*.log | awk -F: '{sum += $2} END {print sum + 0}')
+          echo "warning 计数：$warnings"
+          [ "$warnings" -eq 0 ]
+          soft=$(ls bridge75_ansi_norgb_*.bin | grep -v resetwake | head -1)
+          test -f "${soft%.bin}_resetwake.bin"
+          strings "$soft" | grep -q "bridge75-${TAG}-"
+          ls -l *.bin SHA256SUMS-*
+          # VIA 定义随固件一起发布，文件名保持固定。
+          cp ../bridge75-qmk/docs/via/bridge75-norgb-via.json bridge75-norgb-via.json
+
+      - name: 写入构建摘要
+        working-directory: ${{ github.workspace }}/firmware
+        run: |
+          {
+            echo "### 构建结果"
+            echo
+            echo "Fn+D 前缀：\`bridge75-${TAG}-<构建时间>\`"
+            echo
+            echo '```'
+            cat SHA256SUMS-*
+            echo '```'
+            echo
+            echo "VIA 定义：\`bridge75-norgb-via.json\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 上传固件、校验值、日志和 VIA 定义
+        uses: actions/upload-artifact@v7
+        with:
+          name: bridge75-${{ inputs.tag || 'ci' }}-${{ github.run_number }}
+          if-no-files-found: error
+          retention-days: 90
+          path: |
+            firmware/*.bin
+            firmware/SHA256SUMS-*
+            firmware/bridge75-norgb-via.json
+            firmware/logs-*/**
+
+      - name: 上传失败时的日志
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bridge75-${{ inputs.tag || 'ci' }}-${{ github.run_number }}-logs
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            firmware/logs-*/**

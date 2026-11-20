@@ -38,6 +38,8 @@ python3 keyboards/shortcut/wireless/tests/board/run.py
 
 测试是把真实源码 `#include` 进主机程序，配合桩函数和模拟时间；`test_wireless.c` 里有一个可丢包、带延迟回 ACK 的模拟模块（`sim_module`）。改协议逻辑时要加测试，并确认新测试在旧代码上会失败。
 
+- GitHub Actions：`.github/workflows/build.yml` 在手动触发或推送 `keyboards/`、`tools/`、`build.sh`、`docs/via/` 时，用固定 QMK 基线在 Ubuntu 22.04 上跑同一套 lint、测试和编译，把两个 bin、`SHA256SUMS-*`、日志和 VIA JSON 作为 artifact 上传。改自定义键位时同步更新工作流里的 `expected` 列表。
+
 ## 每次发布新固件要做的事
 
 1. `BRIDGE75_TAG=<标签> ./build.sh`，按上面核对。
