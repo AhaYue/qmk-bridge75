@@ -7,17 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 固件标签（写入文件名和 Fn+D 前缀）
-        required: false
-        default: ci
-  push:
-    branches: [main]
-    paths:
-      - "keyboards/**"
-      - "tools/**"
-      - "build.sh"
-      - "docs/via/**"
-      - ".github/workflows/build.yml"
+        description: 固件标签，格式 via-v<版本>-<日期>，例如 via-v1-20261121
+        required: true
+        default: via-v1-20261121
 
 permissions:
   contents: read
@@ -32,7 +24,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     env:
-      TAG: ${{ inputs.tag || 'ci' }}
+      TAG: ${{ inputs.tag }}
       QMK_DIR: ${{ github.workspace }}/qmk_firmware
       QMK_HOME: ${{ github.workspace }}/qmk_firmware
 
@@ -95,10 +87,11 @@ jobs:
       - name: 编译
         working-directory: bridge75-qmk
         env:
-          BRIDGE75_TAG: ${{ inputs.tag || 'ci' }}
+          BRIDGE75_TAG: ${{ inputs.tag }}
         run: |
           case "$TAG" in
-            *[!A-Za-z0-9._-]*|"") echo "标签 $TAG 含有文件名不允许的字符" >&2; exit 1 ;;
+            via-v[0-9]*-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+            *) echo "标签 $TAG 不符合 via-v<版本>-<日期>，例如 via-v1-20261121" >&2; exit 1 ;;
           esac
           ./build.sh
 
@@ -135,7 +128,7 @@ jobs:
       - name: 上传固件、校验值、日志和 VIA 定义
         uses: actions/upload-artifact@v7
         with:
-          name: bridge75-${{ inputs.tag || 'ci' }}-${{ github.run_number }}
+          name: bridge75-${{ inputs.tag }}-${{ github.run_number }}
           if-no-files-found: error
           retention-days: 90
           path: |
@@ -148,7 +141,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: bridge75-${{ inputs.tag || 'ci' }}-${{ github.run_number }}-logs
+          name: bridge75-${{ inputs.tag }}-${{ github.run_number }}-logs
           if-no-files-found: ignore
           retention-days: 14
           path: |

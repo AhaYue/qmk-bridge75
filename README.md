@@ -51,8 +51,7 @@ python3 keyboards/shortcut/wireless/tests/board/run.py
 
 `.github/workflows/build.yml` 在 GitHub 上跑同一套流程，不需要本机工具链：
 
-1. 仓库 → **Actions** → **构建固件与 VIA 定义** → **Run workflow**，可填标签（默认 `ci`）；标签会写进文件名和 Fn+D 前缀。
-2. 推送到 `main` 且改动涉及 `keyboards/`、`tools/`、`build.sh`、`docs/via/` 或本 workflow 时也会自动构建。
+1. 仓库 → **Actions** → **构建固件与 VIA 定义** → **Run workflow**，填标签，格式为 `via-v<版本>-<日期>`（例如 `via-v1-20261121`）；标签会写进文件名和 Fn+D 前缀，不代表 VIA 官方版本。
 3. 运行结束后在该次运行的 **Artifacts** 里下载 `bridge75-<标签>-<运行号>`，内容为软唤醒版和 `_resetwake` 版 `.bin`、`SHA256SUMS-*`、构建日志和 `bridge75-norgb-via.json`。失败的运行会额外上传日志 artifact。
 
 工作流固定检出 QMK 基线 `33292390974c75362ca30873c482d052e0bd7a63`，使用 Ubuntu 22.04 自带的 ARM GCC 10 和与本机一致的 QMK CLI 1.2.0；构建时间取 runner 的 UTC 时间，以产物文件名为准。私有仓库的 Actions 运行会计入账户的免费分钟数。
