@@ -94,6 +94,8 @@ jobs:
 
       - name: 编译
         working-directory: bridge75-qmk
+        env:
+          BRIDGE75_TAG: ${{ inputs.tag || 'ci' }}
         run: |
           case "$TAG" in
             *[!A-Za-z0-9._-]*|"") echo "标签 $TAG 含有文件名不允许的字符" >&2; exit 1 ;;

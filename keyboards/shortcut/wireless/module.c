@@ -476,8 +476,9 @@ static void md_send_pkt_task(void) {
             smsg_retry = 0;
             smsg_pop();
             smsg_set_state(smsg_state_free);
+            // Send the next queued frame in the same pass.
+            __attribute__((fallthrough));
         }
-            // fall through: send the next queued frame in the same pass.
         case smsg_state_free: {
             uint32_t size = smsg_peek(md_pkt_payload);
             if (size) {
