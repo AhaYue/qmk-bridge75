@@ -24,7 +24,7 @@
 | --- | --- |
 | `bridge75-qmk/` | **本仓库，源码唯一来源。** GitHub 仓库 `AhaYue/qmk-bridge75`，分支 `main` |
 | `qmk-bridge75-ansi-norgb/` | 编译用的官方 QMK checkout，基线 `33292390974c75362ca30873c482d052e0bd7a63`。其中 `keyboards/shortcut/{bridge75,wireless}` 和 `tools/bridge75` 由 `build.sh` 同步覆盖，**不要在那边改，也不要在那边提交**（它的 origin 是官方 qmk/qmk_firmware） |
-| `firmware/` | 构建产物：`.bin`、`SHA256SUMS-*`、`logs-<标签>-<时间>/`、旧版本的补丁。不在 git 里 |
+| `firmware/` | 构建产物：`.bin`、`SHA256SUMS-*`、`logs-<标签>-<时间>/`。只保留当前发布版、ack 2237、diag3。不在 git 里 |
 | 上游参考（已删除） | 原板级适配 `qmk_firmware-em-bridge75`、厂商 RC8 无线实现 `qmk_wireless_rc8` 已移植完毕，本机不保留；需要对照时按 [docs/架构与设计.md](docs/架构与设计.md#2-源码结构) 的命令重新 clone |
 | `.venv-qmk/` | QMK CLI 的 Python 环境，构建脚本会自己设 PATH |
 | `README.md`（工作目录根） | 给用户刷机看的入口，发版时同步更新 |

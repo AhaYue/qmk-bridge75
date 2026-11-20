@@ -16,7 +16,7 @@
 | --- | --- |
 | `bridge75-qmk/` | 本仓库 |
 | `qmk-bridge75-ansi-norgb/` | 编译用的官方 QMK checkout，基线 `33292390974c75362ca30873c482d052e0bd7a63`。其中三个目录会被同步覆盖，**不要在那边改、也不要在那边提交**（它的 origin 是官方 qmk/qmk_firmware） |
-| `firmware/` | 构建产物、校验值、日志；还有旧版本的单文件补丁。不在 git 里 |
+| `firmware/` | 构建产物、校验值、日志。只保留当前发布版和有实测记录的 ack 2237、diag3，其余旧构建已于 2026-11-21 清理（源码在 git 历史里）。不在 git 里 |
 | `.venv-qmk/` | QMK CLI 1.2.0 的 Python 环境；构建脚本另外把 Homebrew ARM GCC 8、binutils、GNU Make 加进 PATH |
 | `README.md` | 给用户刷机看的入口，发版时同步更新 |
 
