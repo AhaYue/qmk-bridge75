@@ -10,7 +10,7 @@
 #define USB_POWER_EN_PIN 4
 #define RGB_MATRIX_SOLID_COLOR 1
 #define MD_BT_NAME "Bridge75 BT$"
-enum { KC_NO, EE_CLR, BT_USB, BR_DIAG, BR_SLEEP, BT_HOST1, BT_HOST2, BT_HOST3, BT_2_4G };
+enum { KC_NO, EE_CLR, BT_USB, BR_DIAG, BR_BAT, BR_SLEEP, BT_HOST1, BT_HOST2, BT_HOST3, BT_2_4G };
 typedef struct { struct { bool pressed; } event; } keyrecord_t;
 typedef uint32_t layer_state_t;
 static layer_state_t default_layer_state = 1, saved_default_layer = 1;

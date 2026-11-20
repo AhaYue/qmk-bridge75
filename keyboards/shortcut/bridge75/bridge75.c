@@ -187,10 +187,16 @@ void md_devs_change(uint8_t devs, bool reset) {
 #endif
 
 static uint32_t indicator_frames;
-static bool     diagnostics_pending;
-static char     diagnostics_text[320];
-static uint16_t diagnostics_pos;
-static uint32_t diagnostics_timer;
+
+// Text typed out through send_char(). Both Fn+D (diagnostics) and the battery
+// key share this buffer so they cannot interleave.
+typedef enum { OUTPUT_NONE, OUTPUT_DIAG, OUTPUT_BAT } output_kind_t;
+
+static output_kind_t output_kind;
+static bool          output_pending;
+static char          output_text[320];
+static uint16_t      output_pos;
+static uint32_t      output_timer;
 static uint16_t pairing_key = KC_NO;
 static uint8_t  pairing_device;
 static uint32_t pairing_timer;
@@ -206,15 +212,22 @@ void wireless_housekeeping_kb(void) {
     for (uint8_t row = 0; row < MATRIX_ROWS; ++row)
         keys_down |= matrix_get_row(row) != 0;
     bool ready = wireless_get_current_devs() == DEVS_USB || *md_getp_state() == MD_STATE_CONNECTED;
-    if (diagnostics_pending && !keys_down && ready && !get_mods() && !get_weak_mods() && !get_oneshot_mods()) {
-        snprintf(diagnostics_text, sizeof(diagnostics_text), "bridge75-" BRIDGE75_BUILD " fw=%u dev=%u state=%u wakes=%lu source=%u retries=%lu drops=%lu sleep=%u bat=%u rx=%lu ack=%lu valid=%lu bad=%lu tx=%lu rgb=%u/%u/%u leds=%lu rail=%u\n", md_get_version(), wireless_get_current_devs(), *md_getp_state(), (unsigned long)lpwr_get_wakeup_count(), lpwr_get_sleep_wakeupcd(), (unsigned long)md_get_retry_count(), (unsigned long)md_get_drop_count(), confinfo.module_sleep, *md_getp_bat(), (unsigned long)md_get_rx_bytes(), (unsigned long)md_get_ack_count(), (unsigned long)md_get_valid_count(), (unsigned long)md_get_bad_count(), (unsigned long)md_get_tx_count(), rgb_matrix_is_enabled(), rgb_matrix_get_mode(), rgb_matrix_get_suspend_state(), (unsigned long)indicator_frames, (unsigned int)gpio_read_pin(LED_POWER_EN_PIN));
-        diagnostics_pending = false;
-        diagnostics_pos     = 0;
-        diagnostics_timer   = timer_read32();
+    if (output_pending && !keys_down && ready && !get_mods() && !get_weak_mods() && !get_oneshot_mods()) {
+        if (output_kind == OUTPUT_DIAG) {
+            snprintf(output_text, sizeof(output_text), "bridge75-" BRIDGE75_BUILD " fw=%u dev=%u state=%u wakes=%lu source=%u retries=%lu drops=%lu sleep=%u bat=%u rx=%lu ack=%lu valid=%lu bad=%lu tx=%lu rgb=%u/%u/%u leds=%lu rail=%u", md_get_version(), wireless_get_current_devs(), *md_getp_state(), (unsigned long)lpwr_get_wakeup_count(), lpwr_get_sleep_wakeupcd(), (unsigned long)md_get_retry_count(), (unsigned long)md_get_drop_count(), confinfo.module_sleep, *md_getp_bat(), (unsigned long)md_get_rx_bytes(), (unsigned long)md_get_ack_count(), (unsigned long)md_get_valid_count(), (unsigned long)md_get_bad_count(), (unsigned long)md_get_tx_count(), rgb_matrix_is_enabled(), rgb_matrix_get_mode(), rgb_matrix_get_suspend_state(), (unsigned long)indicator_frames, (unsigned int)gpio_read_pin(LED_POWER_EN_PIN));
+        } else if (output_kind == OUTPUT_BAT) {
+            snprintf(output_text, sizeof(output_text), "bat=%u", (unsigned int)*md_getp_bat());
+        } else {
+            output_text[0] = '\0';
+        }
+        output_kind    = OUTPUT_NONE;
+        output_pending = false;
+        output_pos     = 0;
+        output_timer   = timer_read32();
     }
-    if (diagnostics_text[diagnostics_pos] && !keys_down && ready && !get_mods() && !get_weak_mods() && !get_oneshot_mods() && timer_elapsed32(diagnostics_timer) >= 30) {
-        send_char(diagnostics_text[diagnostics_pos++]);
-        diagnostics_timer = timer_read32();
+    if (output_text[output_pos] && !keys_down && ready && !get_mods() && !get_weak_mods() && !get_oneshot_mods() && timer_elapsed32(output_timer) >= 30) {
+        send_char(output_text[output_pos++]);
+        output_timer = timer_read32();
     }
 }
 
@@ -243,7 +256,16 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
             return false;
         }
         case BR_DIAG:
-            if (record->event.pressed) diagnostics_pending = true;
+            if (record->event.pressed) {
+                output_kind    = OUTPUT_DIAG;
+                output_pending = true;
+            }
+            return false;
+        case BR_BAT:
+            if (record->event.pressed) {
+                output_kind    = OUTPUT_BAT;
+                output_pending = true;
+            }
             return false;
         case BR_SLEEP:
             if (record->event.pressed) {
@@ -273,8 +295,9 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 
 void wireless_devs_change_kb(uint8_t old_devs, uint8_t new_devs, bool reset) {
     if (old_devs != new_devs || reset) {
-        diagnostics_pending = false;
-        diagnostics_text[diagnostics_pos] = '\0';
+        output_kind               = OUTPUT_NONE;
+        output_pending            = false;
+        output_text[output_pos]   = '\0';
     }
     // USB suspend can disable both the LED rail and renderer. Mode selection
     // must restore status feedback without clearing the current key/layer state.

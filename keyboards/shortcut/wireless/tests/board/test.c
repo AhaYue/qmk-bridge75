@@ -84,9 +84,9 @@ int main(void) {
     startup_pending = false;
     current_device = DEVS_BT1;
     pairing_key = BT_HOST1;
-    diagnostics_pending = true;
-    strcpy(diagnostics_text, "diagnostics from the previous host");
-    diagnostics_pos = 1;
+    output_pending = true;
+    strcpy(output_text, "diagnostics from the previous host");
+    output_pos = 1;
     unsigned before_changes = changes;
     keyrecord_t record = {.event.pressed = false};
     assert(!process_record_kb(BT_USB, &record));
@@ -94,15 +94,21 @@ int main(void) {
     record.event.pressed = true;
     assert(!process_record_kb(BT_USB, &record));
     assert(changes == before_changes + 1 && current_device == DEVS_USB);
-    assert(pairing_key == KC_NO && !diagnostics_pending && !diagnostics_text[diagnostics_pos]);
+    assert(pairing_key == KC_NO && !output_pending && !output_text[output_pos]);
+    assert(!process_record_kb(BR_DIAG, &record));
+    assert(output_pending && output_kind == OUTPUT_DIAG);
+    assert(!process_record_kb(BR_BAT, &record));
+    assert(output_pending && output_kind == OUTPUT_BAT);
+    output_pending = false;
+    output_kind    = OUTPUT_NONE;
     confinfo.module_sleep = true;
     eeconfig_update_kb(confinfo.raw);
     assert(!process_record_kb(EE_CLR, &record));
     assert(!confinfo.module_sleep && confinfo.devs == DEVS_USB);
     assert(renderer_enabled && renderer_mode == RGB_MATRIX_SOLID_COLOR && hsv[2] == 0);
-    puts("PASS board: unsupported saved host, USB key release, cancelled pairing and diagnostics on switch, EEPROM reset LEDs");
+    puts("PASS board: unsupported saved host, USB key release, cancelled pairing and output on switch, EEPROM reset LEDs");
     (void)indicator_frames;
-    (void)diagnostics_timer;
+    (void)output_timer;
     (void)gpio_write_pin_high;
     return 0;
 }

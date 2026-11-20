@@ -8,7 +8,8 @@
 
 | 版本 | 诊断前缀 | 状态 |
 | --- | --- | --- |
-| via 20261121-0106 | `bridge75-via-20261121-0106` | 最新：在 power 基础上加入仅 USB 有线的 VIA/RAW HID。待实机测试 |
+| via2 20261121-0202 | `bridge75-via2-20261121-0202` | 最新：清理 VIA 占位键位，新增 Fn+B 电量输出，输出不带回车，Fn+1–5 为标准设备切换。待实机测试 |
+| via 20261121-0106 | `bridge75-via-20261121-0106` | 已被 via2 取代：仅 USB 有线的 VIA/RAW HID，11 个自定义键位 |
 | power 20261113-2349 | `bridge75-power-20261113-2349` | 诊断加入电量，电量查询 30 秒一次，断线重连逐步退避。待实机测试 |
 | ack 20261113-2237 | `bridge75-ack-20261113-2237` | ACK 对账修正，已在 USB、蓝牙、2.4G 实测 |
 | diag3 | `bridge75-diag3` | 唯一通过蓝牙 6/35 分钟闲置实测的版本 |
@@ -51,8 +52,9 @@ python3 keyboards/shortcut/wireless/tests/board/run.py
 按住 **Esc** 插入 USB 进入 DFU，用 QMK Toolbox 刷入，完成后退出 DFU。
 
 1. 插着 USB 确认能打字。在空白文本编辑器按 **Fn+D**，松手后确认输出开头的标签和时间与固件文件名一致。
-2. 按 **Fn+1** 切到蓝牙 1，快速连打、长按后松手，确认没有卡键，再拔掉 USB。
-3. 从最后一次按键开始分别闲置 **6 分钟**和 **35 分钟**。每轮醒来先输入 `abcdef123456`，确认没有缺首字或明显延迟，再按 **Fn+D** 保存诊断。
+2. 按 **Fn+B**，确认输出 `bat=NN`，数值与 Fn+D 里的 `bat=` 一致；蓝牙下再按一次。两种输出末尾都不按回车，光标停在输出最后。
+3. 按 **Fn+1** 切到蓝牙 1，快速连打、长按后松手，确认没有卡键，再拔掉 USB。
+4. 从最后一次按键开始分别闲置 **6 分钟**和 **35 分钟**。每轮醒来先输入 `abcdef123456`，确认没有缺首字或明显延迟，再按 **Fn+D** 保存诊断。
 
 诊断字段的含义见 [AI 交接](AI交接.md) 的排查经验一节。正常时 `tx` 与 `ack` 接近，`retries` 约为丢包数的两倍，`bad=0`。
 
@@ -60,9 +62,9 @@ python3 keyboards/shortcut/wireless/tests/board/run.py
 
 固件只在 **USB 有线模式**下提供 VIA（RAW HID）；切到蓝牙或 2.4G 时 USB 会断开，VIA 不可用。
 
-1. 用 USB 线连接键盘并切到有线（Fn+`` ` ``，Fn+D 里 `dev=0`）。
+1. 用 USB 线连接键盘并切到有线（Fn+5，Fn+D 里 `dev=0`）。
 2. 打开 <https://usevia.app>，进入 **Design** 标签，点 **Load Draft Definition**，选择 [`docs/via/bridge75-norgb-via.json`](docs/via/bridge75-norgb-via.json)。
-3. 回到 **Configure** 标签选择 `Bridge75 NoRGB`，即可读取和改写键位。定义加载一次后浏览器会记住。
+3. 回到 **Configure** 标签选择 `Bridge75 NoRGB`，即可读取和改写键位。定义加载一次后浏览器会记住。via2 的定义只有 8 个自定义键位（蓝牙 1–3、2.4G、USB、诊断、电量、模块休眠）；via 版（11 项）的旧定义不能用于 via2。
 4. 按 **Fn+Esc** 清空 EEPROM 会恢复编译进固件的默认键位。
 
 VIA 列表里可能仍有 `Bridge75 2.4G`：那是接收器自己的 raw HID 接口，不是本固件，配置不到键盘。
@@ -71,11 +73,12 @@ VIA 列表里可能仍有 `Bridge75 2.4G`：那是接收器自己的 raw HID 接
 
 | 按键 | 功能 |
 | --- | --- |
-| Fn+` | 切到 USB |
 | Fn+1 / 2 / 3 | 切到蓝牙 1 / 2 / 3，长按 1 秒重新配对 |
 | Fn+4 | 切到 2.4G，长按 1 秒重新配对 |
-| Fn+5 | 切换并保存模块 30 分钟休眠（诊断里的 `sleep`） |
+| Fn+5 | 切到有线 USB |
+| Fn+` | 切换并保存模块 30 分钟休眠（诊断里的 `sleep`） |
 | Fn+D | 输出诊断 |
+| Fn+B | 输出电量（`bat=NN`） |
 | Fn+左 Win | 切换 Windows / Mac 默认层 |
 | Fn+Esc | 清空 EEPROM，回到 USB 模式 |
 

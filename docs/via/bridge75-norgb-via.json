@@ -181,29 +181,14 @@
       "shortName": "USB"
     },
     {
-      "name": "BT_SW",
-      "title": "模块开关",
-      "shortName": "BT_SW"
-    },
-    {
-      "name": "BT_VOL",
-      "title": "模块音量",
-      "shortName": "BT_VOL"
-    },
-    {
-      "name": "USBSLP",
-      "title": "USB 睡眠",
-      "shortName": "SLP"
-    },
-    {
-      "name": "RGBTEST",
-      "title": "灯效测试",
-      "shortName": "RGB"
-    },
-    {
       "name": "DIAG",
-      "title": "Fn+D 诊断",
+      "title": "Fn+D 诊断输出",
       "shortName": "DIAG"
+    },
+    {
+      "name": "BAT",
+      "title": "电量（打字输出）",
+      "shortName": "BAT"
     },
     {
       "name": "SLEEP",

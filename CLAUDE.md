@@ -69,14 +69,16 @@ bridge75-power-20261113-2349 fw=0 dev=1 state=2 wakes=0 source=0 retries=6 drops
 
 ## 当前状态（2026-11-21）
 
-- 最新：via 20261121-0106，在 power 基础上加入仅 USB 有线的 VIA/RAW HID，待实机测试；power 20261113-2349 的无线项也仍待测。ack 20261113-2237 已在 USB、蓝牙、2.4G 验证 ACK 修正（丢包率约 0.14%–0.8%）。diag3 是唯一通过蓝牙 6/35 分钟闲置实测的版本。
+- 最新：via2 20261121-0202，在 via 基础上删除 4 个未实现的自定义键位（VIA 定义缩为 8 项），新增 Fn+B 电量输出 `bat=NN`，Fn+D/Fn+B 输出末尾不再按回车，默认键位改为 Fn+1–5 = 蓝牙 1–3、2.4G、有线（模块休眠移到 Fn+`），待实机测试。via 20261121-0106 已被取代；power 20261113-2349 的无线项也仍待测。ack 20261113-2237 已在 USB、蓝牙、2.4G 验证 ACK 修正（丢包率约 0.14%–0.8%）。diag3 是唯一通过蓝牙 6/35 分钟闲置实测的版本。
 - **待用户测试**：
   1. 2.4G 下 `drops=76` 的来源：保持连接，打字前后各按一次 Fn+D，看 `drops` 是否增长。这 76 次不是配对产生的（接收器本来就已配对，切过去即连上）。
-  2. 蓝牙闲置 6 分钟和 35 分钟后的首键（项目最初的问题），via 版上还没测。
+  2. 蓝牙闲置 6 分钟和 35 分钟后的首键（项目最初的问题），via/via2 上还没测。
   3. 主机离开：蓝牙模式下关掉电脑蓝牙 30–60 分钟，看能否自动回连，以及 `wakes`/`source`（`source=2` 很多表示被模块消息反复唤醒）。
   4. 闲置前后各记一次 `bat`，估算待机耗电；可选：整夜放置；`sleep=1` 下 35 分钟（缓存 5 秒的报告重放可能让首键只是晚到而不丢）。
   5. 2.4G 下电脑睡眠和唤醒（只有 2.4G 会走 `md_receive_host_cb`），从未实测。
-  6. 有线 VIA：在 usevia.app 的 Design 页加载 `docs/via/bridge75-norgb-via.json`，确认能读写键位；Fn+Esc 后恢复默认键位；切到蓝牙/2.4G 后设备从 VIA 列表消失。
+  6. 有线 VIA：在 usevia.app 的 Design 页加载 `docs/via/bridge75-norgb-via.json`（8 项），确认能读写键位、能选到 `DIAG`/`BAT`/`SLEEP`；Fn+Esc 后恢复默认键位；切到蓝牙/2.4G 后设备从 VIA 列表消失。
+  7. Fn+B：USB 和蓝牙下各按一次，确认输出 `bat=NN`，且与 Fn+D 里的 `bat=` 一致；两种输出末尾都没有回车。
+  8. Fn+1–5 依次切到蓝牙 1–3、2.4G、有线；Fn+` 切换模块休眠；Fn+Esc 清 EEPROM。
 - 已知取舍：ACK 不带序号。每丢一份会让两个报告各晚约 30 ms；要降到一次就得承担 ACK 错配丢帧的风险，不要改回去。
 
 ## 已知风险与可改进点
@@ -86,6 +88,7 @@ bridge75-power-20261113-2349 fw=0 dev=1 state=2 wakes=0 source=0 retries=6 drops
 - 醒着时 MCU 全速运行 5 分钟（`LPWR_TIMEOUT`），6 颗 WS2812 的供电直到休眠前才切断。
 - `smsg` 环形缓冲的正确性依赖未写明的容量关系，有百万次队列测试兜底，改 `SMSG_NUM`/`SMSG_PAYLOAD_LEN` 前先想清楚。
 - RAW HID 只支持 USB 有线（VIA），无线不隧道 RAW HID；`wireless.mk` 在未声明 `BRIDGE75_USB_RAW_HID=yes` 时会拒绝显式打开的 `RAW_ENABLE`。`VIA_ENABLE` 必须放在 keymap 的 `rules.mk`，键盘级会被 `qmk lint` 拒绝。
+- VIA 定义现在是 8 项，顺序必须与 `info.json` 的 `keycodes` 一致；不要再加入没有处理函数的键位。`BR_DIAG`、`BR_BAT` 共用 `bridge75.c` 的 `output_text` 缓冲，`BR_SLEEP` 仍独立；改输出逻辑时注意不要让两种输出交错。VIA magic 随构建时间变化，刷入新固件后旧键图会自动重置。
 
 ## 约定
 

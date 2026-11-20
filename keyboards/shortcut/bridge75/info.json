@@ -70,22 +70,10 @@
             "key": "BT_USB"
         },
         {
-            "key": "BT_SW"
-        },
-        {
-            "key": "BT_VOL"
-        },
-        {
-            "key": "USBSLP"
-        },
-        {
-            "key": "RGB_TEST",
-            "aliases": [
-                "RGBTEST"
-            ]
-        },
-        {
             "key": "BR_DIAG"
+        },
+        {
+            "key": "BR_BAT"
         },
         {
             "key": "BR_SLEEP",
