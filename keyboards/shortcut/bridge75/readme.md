@@ -1,71 +1,57 @@
-# Bridge75 ANSI NoRGB wireless port
+# Bridge75 ANSI NoRGB
 
-This target supports the Shortcut Studio Bridge75 ANSI NoRGB with a WB32FQ95
-MCU and a proprietary CH582F wireless module. The six WS2812 status LEDs are
-retained: Caps Lock, Escape battery, Bluetooth 1–3, and 2.4 GHz.
+QMK support for the Shortcut Studio Bridge75 ANSI NoRGB: WB32FQ95 MCU with a
+proprietary CH582F wireless module (UART, 115200 baud). USB, Bluetooth 1–3 and
+the 2.4 GHz receiver are supported. VIA works over USB only.
 
-## Build and flash
+* Keyboard Maintainer: see the repository `AhaYue/bridge75-qmk`
+* Hardware Supported: Bridge75 ANSI NoRGB (six WS2812 status LEDs: Caps Lock,
+  Escape/battery, Bluetooth 1–3, 2.4 GHz)
+* USB ID: `FFFE:003E`, bootloader `wb32-dfu`
 
-```sh
-sh tools/bridge75/build.sh
-```
+Make example for this keyboard (after setting up your build environment):
 
-The script runs lint and the host-side regressions, then builds
-`bridge75_ansi_norgb_final.bin` in the workspace's `firmware` directory.
-Use this file for normal operation. The separate `_final_resetwake.bin` fallback
-restarts the MCU after STOP wake and can lose the initial keystrokes.
+    qmk compile -kb shortcut/bridge75/ansi_norgb -km default
 
-Hold Escape while inserting the USB cable to enter the `wb32-dfu` bootloader.
-Use QMK Toolbox to flash the supplied `.bin`; do not disconnect during flashing.
-The USB identity is `FFFE:003E`; old VIA definitions are incompatible. VIA is
-outside this port's supported scope.
+Release builds are made with `build.sh` in the repository root, which runs lint
+and the host tests, stamps a build tag into the firmware and also produces the
+`_resetwake` fallback (`WB32_WAKE_RESET_HACK=yes`: the MCU restarts after STOP
+wake and may lose the first keystroke).
 
-## Default keys
+## Bootloader
 
-The right key next to right Alt/GUI is Fn. Both Windows and Mac Fn layers have:
+Hold **Esc** while plugging in USB, then flash with QMK Toolbox. Unplug and
+replug afterwards so the keyboard leaves DFU.
 
-| Combination | Action |
+## Keys (Fn layer, identical on the Windows and Mac layouts)
+
+| Keys | Action |
 | --- | --- |
-| Fn + grave | USB |
-| Fn + 1 / 2 / 3 | Bluetooth host 1 / 2 / 3 |
-| Fn + 4 | 2.4 GHz |
-| Hold Fn + 1 / 2 / 3 / 4 for one second | Pair the selected host |
-| Fn + 5 | Toggle the wireless module's 30-minute sleep policy; saved in EEPROM |
-| Fn + D | Type diagnostics after all keys and modifiers are released |
-| Fn + left Alt/GUI position | Switch Windows/Mac base layer |
-| Fn + Escape | Reset EEPROM and return to USB defaults |
+| Fn+1 / 2 / 3 | Bluetooth host 1 / 2 / 3; hold 1 s to pair |
+| Fn+4 | 2.4 GHz receiver; hold 1 s to pair |
+| Fn+5 | USB |
+| Fn+` | Toggle the module's 30-minute sleep (saved, default off) |
+| Fn+D | Type a diagnostic line |
+| Fn+B | Type the battery level (`bat=NN`) |
+| Fn+Win (2nd key of the bottom row) | Switch Windows / Mac base layer (saved) |
+| Fn+Esc | Reset EEPROM: default keymap, USB mode, module sleep off |
+| Fn+F1…F12 | Brightness, Mission Control, Launchpad, F5, F6, media, mute, volume |
 
-Open a plain text editor before Fn+D. Keep the keyboard idle while the line is
-typed. The line starts with `bridge75-<tag>-<YYYYMMDD-HHMM>` (or `bridge75-dev` outside `tools/bridge75/build.sh`) and includes the module firmware byte (`fw`), selected device,
-connection state, STOP wake count and source, transmit retries, dropped messages,
-and module sleep setting (`sleep=0` means disabled). Output pauses while keys
-are held or wireless is disconnected. Counters reset on MCU restart; the reset
-fallback therefore cannot preserve pre-reset wake statistics.
+Diagnostic and battery output carries no trailing newline. It starts only when
+all keys are released and the keyboard is on USB or connected wirelessly. The
+line begins with `bridge75-<tag>-<YYYYMMDD-HHMM>` (`bridge75-dev` when built
+without `build.sh`).
 
-A versioned keyboard EEPROM record defaults to USB and module sleep disabled.
-An old record is reset on first boot. The module sleep commands exist in the
-protocol, but their effect on this hardware must be measured. Disabling module
-sleep can increase battery use. MCU STOP sleep remains enabled after five minutes
-of inactivity; the status LED timeout is one minute.
+## Behaviour
 
-## Hardware checks
+* The MCU enters STOP after 5 minutes without input in wireless mode (never
+  while a cable is attached) and wakes on a key press or module message,
+  keeping the first keystroke.
+* The saved transport is restored on the first housekeeping pass, because
+  `protocol_post_init()` installs the USB driver after `keyboard_post_init_kb()`.
+* Wireless mode stops and disconnects USB, so VIA is unavailable there. The VIA
+  definition is `docs/via/bridge75-norgb-via.json` in the repository.
+* Status LEDs ignore stored RGB settings. Invalid default layers reset to
+  Windows; an EEPROM record with an unknown version resets to USB defaults.
 
-Check USB, all Bluetooth hosts, 2.4 GHz, pairing, Caps and battery indicators.
-After 6 minutes and again after at least 35 minutes of wireless idle, type a word
-immediately and verify every letter. Capture diagnostics in each mode. Repeat the
-35-minute check with module sleep enabled and monitor standby battery use. Compare
-the reset fallback if normal wake fails.
-
-The default base layers use standard QMK US keycodes. Diagnostic ASCII output
-assumes the host uses a compatible keyboard layout.
-
-## Startup and indicators
-
-Saved wireless transport is restored on the first main-loop pass, after QMK's
-`protocol_post_init()` installs its USB host driver. Device changes requeue module
-name/configuration after flushing the previous device's TX queue. Control-only
-transmit failures trigger reconnection without requiring a new keystroke.
-Status LEDs are enabled independently of old RGB enable/mode EEPROM settings and
-restored after a mode change. Fn shows blue Escape feedback before battery data is
-available. Invalid persistent default layers are reset to the Windows base.
-Verify basic Fn, pairing and USB return before repeating the long-idle tests.
+Documentation (Chinese): `README.md` and `docs/` in the repository root.

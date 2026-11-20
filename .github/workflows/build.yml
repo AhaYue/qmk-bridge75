@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 固件标签，格式 via-v<版本>-<日期>，例如 via-v1-20261121
+        description: 固件标签，格式 via-v<版本号>-<日期>，例如 via-v1.5-20261121
         required: true
-        default: via-v1-20261121
+        default: via-v1.5-20261121
 
 permissions:
   contents: read
@@ -89,10 +89,10 @@ jobs:
         env:
           BRIDGE75_TAG: ${{ inputs.tag }}
         run: |
-          case "$TAG" in
-            via-v[0-9]*-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
-            *) echo "标签 $TAG 不符合 via-v<版本>-<日期>，例如 via-v1-20261121" >&2; exit 1 ;;
-          esac
+          if ! printf '%s\n' "$TAG" | grep -Eqx 'via-v[0-9]+(\.[0-9]+)?-[0-9]{8}'; then
+            echo "标签 $TAG 不符合 via-v<版本号>-<日期>，例如 via-v1.5-20261121" >&2
+            exit 1
+          fi
           ./build.sh
 
       - name: 核对产物
