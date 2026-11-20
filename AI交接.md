@@ -8,7 +8,7 @@
 
 ## 2. 源码与本机目录
 
-本仓库（GitHub `AhaYue/bridge75-qmk`，分支 `main`）是**源码的唯一来源**，只包含 `keyboards/shortcut/{bridge75,wireless}`、`tools/bridge75`、文档和 CI。编译时 `build.sh` 用 rsync 把这三个目录同步进一个官方 QMK checkout 再构建。
+本仓库（GitHub `AhaYue/qmk-bridge75`，分支 `main`）是**源码的唯一来源**，只包含 `keyboards/shortcut/{bridge75,wireless}`、`tools/bridge75`、文档和 CI。编译时 `build.sh` 用 rsync 把这三个目录同步进一个官方 QMK checkout 再构建。
 
 维护者本机的工作目录 `/Volumes/Store/键盘/`：
 

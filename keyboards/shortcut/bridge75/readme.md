@@ -4,7 +4,7 @@ QMK support for the Shortcut Studio Bridge75 ANSI NoRGB: WB32FQ95 MCU with a
 proprietary CH582F wireless module (UART, 115200 baud). USB, Bluetooth 1–3 and
 the 2.4 GHz receiver are supported. VIA works over USB only.
 
-* Keyboard Maintainer: see the repository `AhaYue/bridge75-qmk`
+* Keyboard Maintainer: see the repository `AhaYue/qmk-bridge75`
 * Hardware Supported: Bridge75 ANSI NoRGB (six WS2812 status LEDs: Caps Lock,
   Escape/battery, Bluetooth 1–3, 2.4 GHz)
 * USB ID: `FFFE:003E`, bootloader `wb32-dfu`

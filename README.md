@@ -14,7 +14,7 @@
 
 | 版本 | Fn+D 前缀 | 状态 |
 | --- | --- | --- |
-| **via-v1.5-20261121** | `bridge75-via-v1.5-20261121-20261121-0356` | **当前发布版**，见 [GitHub Release](https://github.com/AhaYue/bridge75-qmk/releases/tag/via-v1.5-20261121)。实机待测。功能见下方"功能" |
+| **via-v1.5-20261121** | `bridge75-via-v1.5-20261121-20261121-0356` | **当前发布版**，见 [GitHub Release](https://github.com/AhaYue/qmk-bridge75/releases/tag/via-v1.5-20261121)。实机待测。功能见下方"功能" |
 | ack 20261113-2237 | `bridge75-ack-20261113-2237` | ACK 修正已在 USB、蓝牙、2.4G 实测；没有 VIA、Fn+B，键位为旧布局 |
 | diag3 | `bridge75-diag3` | 唯一通过蓝牙 6/35 分钟闲置首键实测的版本，作对照 |
 
