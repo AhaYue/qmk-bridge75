@@ -8,7 +8,7 @@
 
 | 路径 | 作用 |
 | --- | --- |
-| `bridge75-qmk/` | **本仓库，源码唯一来源。** GitHub 私有仓库 `AhaYue/bridge75-qmk`，分支 `main` |
+| `bridge75-qmk/` | **本仓库，源码唯一来源。** GitHub 私有仓库 `AhaYue/qmk-bridge75`，分支 `main` |
 | `qmk-bridge75-ansi-norgb/` | 编译用的官方 QMK checkout，基线 `33292390974c75362ca30873c482d052e0bd7a63`。其中 `keyboards/shortcut/{bridge75,wireless}` 和 `tools/bridge75` 由 `build.sh` 同步覆盖，**不要在那边改，也不要在那边提交**（它的 origin 是官方 qmk/qmk_firmware） |
 | `firmware/` | 构建产物：`.bin`、`SHA256SUMS-*`、`logs-<标签>-<时间>/`、旧版本的补丁和说明。不在 git 里 |
 | `qmk_firmware-em-bridge75/`、`qmk_wireless_rc8/` | 只读参考：原板级适配、厂商 RC8 无线实现 |
