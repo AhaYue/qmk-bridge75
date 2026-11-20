@@ -17,12 +17,10 @@
 | `bridge75-qmk/` | 本仓库 |
 | `qmk-bridge75-ansi-norgb/` | 编译用的官方 QMK checkout，基线 `33292390974c75362ca30873c482d052e0bd7a63`。其中三个目录会被同步覆盖，**不要在那边改、也不要在那边提交**（它的 origin 是官方 qmk/qmk_firmware） |
 | `firmware/` | 构建产物、校验值、日志；还有旧版本的单文件补丁。不在 git 里 |
-| `qmk_firmware-em-bridge75/` | 只读参考：原项目，分支 `em-bridge75`，基线 `da9e806e39`，旧目标 `shortcut/bridge75_nolight`。核对引脚、灯供电极性、键位用 |
-| `qmk_wireless_rc8/` | 只读参考：厂商 RC8 无线实现，基线 `c0f86de489`。查模块命令、串口帧、STOP 寄存器用 |
 | `.venv-qmk/` | QMK CLI 1.2.0 的 Python 环境；构建脚本另外把 Homebrew ARM GCC 8、binutils、GNU Make 加进 PATH |
 | `README.md` | 给用户刷机看的入口，发版时同步更新 |
 
-数据流：原项目板级适配 + RC8 无线库 → 本仓库 → `build.sh` 同步进 QMK checkout 编译 → `firmware/`。提交历史按"移植 → ACK 修正 → 功耗 → VIA → via2 → CI"分开，`git log -p` 可看每一步。
+数据流：原项目板级适配 + RC8 无线库（两者本机已删除，需要时按[架构与设计](docs/架构与设计.md#2-源码结构)里的命令重新 clone）→ 本仓库 → `build.sh` 同步进 QMK checkout 编译 → `firmware/`。提交历史按"移植 → ACK 修正 → 功耗 → VIA → via2 → CI"分开，`git log -p` 可看每一步。
 
 ## 3. 从哪里读起
 
