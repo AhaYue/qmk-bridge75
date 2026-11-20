@@ -8,7 +8,8 @@
 
 | 版本 | 诊断前缀 | 状态 |
 | --- | --- | --- |
-| power 20261113-2349 | `bridge75-power-20261113-2349` | 最新：诊断加入电量，电量查询 30 秒一次，断线重连逐步退避。待实机测试 |
+| via 20261121-0106 | `bridge75-via-20261121-0106` | 最新：在 power 基础上加入仅 USB 有线的 VIA/RAW HID。待实机测试 |
+| power 20261113-2349 | `bridge75-power-20261113-2349` | 诊断加入电量，电量查询 30 秒一次，断线重连逐步退避。待实机测试 |
 | ack 20261113-2237 | `bridge75-ack-20261113-2237` | ACK 对账修正，已在 USB、蓝牙、2.4G 实测 |
 | diag3 | `bridge75-diag3` | 唯一通过蓝牙 6/35 分钟闲置实测的版本 |
 
@@ -54,6 +55,17 @@ python3 keyboards/shortcut/wireless/tests/board/run.py
 3. 从最后一次按键开始分别闲置 **6 分钟**和 **35 分钟**。每轮醒来先输入 `abcdef123456`，确认没有缺首字或明显延迟，再按 **Fn+D** 保存诊断。
 
 诊断字段的含义见 [AI 交接](AI交接.md) 的排查经验一节。正常时 `tx` 与 `ack` 接近，`retries` 约为丢包数的两倍，`bad=0`。
+
+## 有线 VIA
+
+固件只在 **USB 有线模式**下提供 VIA（RAW HID）；切到蓝牙或 2.4G 时 USB 会断开，VIA 不可用。
+
+1. 用 USB 线连接键盘并切到有线（Fn+`` ` ``，Fn+D 里 `dev=0`）。
+2. 打开 <https://usevia.app>，进入 **Design** 标签，点 **Load Draft Definition**，选择 [`docs/via/bridge75-norgb-via.json`](docs/via/bridge75-norgb-via.json)。
+3. 回到 **Configure** 标签选择 `Bridge75 NoRGB`，即可读取和改写键位。定义加载一次后浏览器会记住。
+4. 按 **Fn+Esc** 清空 EEPROM 会恢复编译进固件的默认键位。
+
+VIA 列表里可能仍有 `Bridge75 2.4G`：那是接收器自己的 raw HID 接口，不是本固件，配置不到键盘。
 
 ## 键位要点
 
